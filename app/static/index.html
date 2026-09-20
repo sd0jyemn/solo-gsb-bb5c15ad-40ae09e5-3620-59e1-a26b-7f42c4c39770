@@ -122,6 +122,7 @@
       <div class="grid">
         <div class="card">
           <h3>实时排名（Schulze）</h3>
+          <p class="muted select-hint">点击两个候选项名称，可在下方查看「排名依据」。</p>
           <div id="ranking"></div>
         </div>
         <div class="card">
@@ -130,9 +131,23 @@
         </div>
       </div>
 
+      <!-- 排名依据：双向最强路径解释 -->
+      <div id="basis-card" class="card basis">
+        <h3>🧭 排名依据</h3>
+        <p class="muted">
+          在实时排名中点击两个候选项名称，或在胜负矩阵中点击行/列表头与格子，
+          即可查看两者之间的双向最强路径与最终判定。
+        </p>
+        <div id="basis-pick" class="basis-pick">
+          <span id="basis-pick-text" class="muted">尚未选择候选项</span>
+          <button id="basis-clear" type="button" class="hidden">✕ 清除选择</button>
+        </div>
+        <div id="basis-result"></div>
+      </div>
+
       <div class="card">
         <h3>胜负矩阵</h3>
-        <p class="muted">行 vs 列：✓ 行胜 · ✗ 行负 · ＝ 平局 · · 未比较</p>
+        <p class="muted">行 vs 列：✓ 行胜 · ✗ 行负 · ＝ 平局 · · 未比较（点击表头或格子可加入「排名依据」选择；红色/黄色格仍为冲突复核入口）</p>
         <div id="matrix-wrap"></div>
       </div>
     </section>

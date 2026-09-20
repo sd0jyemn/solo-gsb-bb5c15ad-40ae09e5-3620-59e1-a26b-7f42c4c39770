@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 
 from .conflict import minimum_tie_resolution, shortest_cycle
 from .priority import recommend_next_pair
-from .schulze import rank_groups, strongest_paths
+from .schulze import explain_pair, rank_groups, strongest_paths
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -234,6 +234,39 @@ def get_session(sid: str):
     conn = get_conn()
     try:
         return load_state(conn, sid)
+    finally:
+        conn.close()
+
+
+@app.get("/api/sessions/{sid}/ranking-basis")
+def ranking_basis(sid: str, a: str, b: str):
+    """「排名依据」：在现有 Schulze 计算之上为两个候选项重建双向最强路径。
+
+    路径在与排名完全相同的直接比较矩阵上重建，瓶颈强度等于最强路径矩阵
+    对应值，前端可逐边核验；选择规则为瓶颈最大 → 边数最少 → 候选录入顺序
+    字典序最小，路径不重复节点。未形成路径时对应方向 strength=0、path=null。
+    只读接口，不写库；新增判断、撤销、复核、批量改判后重新请求即随状态刷新。
+    """
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT candidates FROM sessions WHERE id = ?", (sid,)
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="会话不存在或已被删除")
+        candidates: list[str] = json.loads(row["candidates"])
+        if a == b:
+            raise HTTPException(422, "请选择两个不同的候选项")
+        if a not in candidates or b not in candidates:
+            raise HTTPException(422, "候选项不属于当前会话")
+        history = [
+            {"a": r["a"], "b": r["b"], "result": r["result"]}
+            for r in conn.execute(
+                "SELECT a, b, result FROM judgments WHERE session_id = ? ORDER BY id",
+                (sid,),
+            )
+        ]
+        return explain_pair(candidates, history, a, b)
     finally:
         conn.close()
 

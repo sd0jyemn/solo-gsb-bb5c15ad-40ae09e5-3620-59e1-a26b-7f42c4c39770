@@ -375,6 +375,124 @@ table.matrix th {
 }
 #jump-banner button { padding: 0.25rem 0.8rem; font-size: 0.85rem; }
 
+/* ---------- 排名依据 ---------- */
+#basis-card { border-color: rgba(62, 207, 142, 0.5); }
+.select-hint { margin: -0.3rem 0 0.6rem; font-size: 0.82rem; }
+.rank-name {
+  font-family: inherit;
+  font-size: inherit;
+  background: transparent;
+  border: 1px dashed transparent;
+  border-radius: 8px;
+  padding: 0.05rem 0.35rem;
+  color: var(--text);
+}
+.rank-name:hover { background: rgba(62, 207, 142, 0.12); border-color: rgba(62, 207, 142, 0.5); }
+.rank-name.selected {
+  background: rgba(62, 207, 142, 0.18);
+  border-color: var(--green);
+  border-style: solid;
+  color: var(--green);
+}
+
+.basis-pick {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  margin: 0.4rem 0 0.9rem;
+  font-size: 0.92rem;
+}
+.basis-pick-tag {
+  display: inline-block;
+  margin: 0 0.15rem;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid var(--green);
+  border-radius: 99px;
+  color: var(--green);
+  font-size: 0.85rem;
+}
+#basis-clear { padding: 0.25rem 0.8rem; font-size: 0.82rem; }
+
+.basis-verdict {
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 0.9rem;
+  font-size: 1rem;
+  border: 1px solid var(--card-border);
+  background: var(--bg);
+}
+.basis-verdict strong { font-size: 1.05rem; }
+.verdict-a { border-color: rgba(62, 207, 142, 0.6); background: rgba(62, 207, 142, 0.1); }
+.verdict-a strong { color: var(--green); }
+.verdict-b { border-color: rgba(255, 107, 107, 0.6); background: rgba(255, 107, 107, 0.1); }
+.verdict-b strong { color: var(--red); }
+.verdict-tie { border-color: rgba(245, 197, 66, 0.6); background: rgba(245, 197, 66, 0.1); }
+.verdict-tie strong { color: var(--yellow); }
+
+.basis-dir {
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 0.7rem;
+}
+.basis-dir-head { margin: 0 0 0.4rem; font-weight: 600; font-size: 0.9rem; }
+.basis-meta { margin: 0 0 0.5rem; font-size: 0.84rem; color: var(--muted); }
+.basis-no-path {
+  color: var(--muted);
+  font-size: 0.92rem;
+  padding: 0.3rem 0;
+}
+.basis-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  line-height: 1.9;
+}
+.basis-node {
+  background: #202941;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 0.1rem 0.55rem;
+  font-size: 0.88rem;
+}
+.basis-arrow {
+  font-size: 0.8rem;
+  border-radius: 99px;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid rgba(62, 207, 142, 0.45);
+  color: var(--green);
+  white-space: nowrap;
+}
+.basis-arrow.bottleneck {
+  border-color: var(--yellow);
+  color: var(--yellow);
+  background: rgba(245, 197, 66, 0.12);
+}
+.basis-note { font-size: 0.82rem; margin: 0.5rem 0 0; }
+.basis-loading { margin: 0.4rem 0; }
+.basis-error { color: var(--red); margin: 0.4rem 0; }
+
+/* 矩阵中参与排名依据选择 / 位于解释路径上的标记 */
+table.matrix th.selectable-th { cursor: pointer; }
+table.matrix th.selectable-th:hover { color: var(--green); }
+table.matrix th.th-selected {
+  color: var(--green);
+  box-shadow: inset 0 0 0 2px var(--green);
+}
+td.selectable-cell { cursor: pointer; }
+td.selectable-cell:hover { background: rgba(62, 207, 142, 0.16); }
+td.cell-path-fwd {
+  box-shadow: inset 0 0 0 2px rgba(62, 207, 142, 0.85);
+  background: rgba(62, 207, 142, 0.14);
+}
+td.cell-path-back {
+  box-shadow: inset 0 0 0 2px rgba(91, 140, 255, 0.85);
+  background: rgba(91, 140, 255, 0.14);
+}
+
 /* ---------- 提示条 ---------- */
 #toast {
   position: fixed;
