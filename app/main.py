@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .conflict import minimum_tie_resolution, shortest_cycle
+from .paths import pair_explanation
 from .priority import recommend_next_pair
 from .schulze import rank_groups, strongest_paths
 
@@ -234,6 +235,37 @@ def get_session(sid: str):
     conn = get_conn()
     try:
         return load_state(conn, sid)
+    finally:
+        conn.close()
+
+
+@app.get("/api/sessions/{sid}/ranking-basis")
+def ranking_basis(sid: str, a: str, b: str):
+    """「排名依据」：两个候选项之间的双向最强路径与最终相对判定。
+
+    路径在与排名相同的 Schulze 计算中重建（并在内部与 Floyd–Warshall
+    强度矩阵交叉核对）：同强度路径优先边数更少，再按候选录入顺序稳定
+    选择，路径不重复节点；任一方向不可达时对应路径明确标记为无有效路径。
+    纯只读接口，不写库、不影响任何现有接口；面板随各写操作返回的状态刷新。
+    """
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT candidates FROM sessions WHERE id = ?", (sid,)
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="会话不存在或已被删除")
+        candidates: list[str] = json.loads(row["candidates"])
+        if a == b or a not in candidates or b not in candidates:
+            raise HTTPException(422, "无效的候选项组合")
+        history = [
+            {"a": r["a"], "b": r["b"], "result": r["result"]}
+            for r in conn.execute(
+                "SELECT a, b, result FROM judgments WHERE session_id = ? ORDER BY id",
+                (sid,),
+            )
+        ]
+        return pair_explanation(candidates, history, a, b)
     finally:
         conn.close()
 

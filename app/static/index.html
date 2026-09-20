@@ -122,6 +122,7 @@
       <div class="grid">
         <div class="card">
           <h3>实时排名（Schulze）</h3>
+          <p class="muted card-hint">点击两个候选项名称，可在下方查看「排名依据」</p>
           <div id="ranking"></div>
         </div>
         <div class="card">
@@ -130,9 +131,23 @@
         </div>
       </div>
 
+      <!-- 排名依据 -->
+      <div id="basis-card" class="card hidden">
+        <div class="basis-head">
+          <h3>📊 排名依据：<span id="basis-pair"></span></h3>
+          <button id="basis-close" type="button">✕ 关闭</button>
+        </div>
+        <p id="basis-verdict" class="basis-verdict"></p>
+        <p class="muted">
+          路径强度为路径上最弱一环（胜负边 1.0、平局边 0.5）；同强度路径优先边数更少，
+          再按候选录入顺序稳定选择，路径不重复节点。判定与上方实时排名一致。
+        </p>
+        <div id="basis-directions" class="basis-directions"></div>
+      </div>
+
       <div class="card">
         <h3>胜负矩阵</h3>
-        <p class="muted">行 vs 列：✓ 行胜 · ✗ 行负 · ＝ 平局 · · 未比较</p>
+        <p class="muted">行 vs 列：✓ 行胜 · ✗ 行负 · ＝ 平局 · · 未比较（点击行/列标题选择两个候选项查看排名依据）</p>
         <div id="matrix-wrap"></div>
       </div>
     </section>

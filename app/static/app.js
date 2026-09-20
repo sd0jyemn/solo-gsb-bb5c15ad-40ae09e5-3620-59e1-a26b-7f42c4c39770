@@ -7,6 +7,9 @@ let state = null;
 let busy = false;
 let selectedPair = null; // 冲突环上待重新判定的组合 {a, b}
 let focusPair = null; // 跳转到推荐组合后的当前评审组合 {a, b}，null 表示按原顺序
+let basisSelection = []; // 「排名依据」面板中已选中的候选项（至多 2 个）
+let basisReq = 0; // 排名依据请求序号，丢弃过期响应
+let basisData = null; // 当前面板展示的排名依据数据
 
 /* ---------- 工具 ---------- */
 
@@ -71,10 +74,11 @@ function render() {
   renderMatrix();
   renderConflict();
   renderNextPair();
+  renderBasis();
 }
 
 function renderRanking() {
-  renderRankingInto($("#ranking"), state.ranking);
+  renderRankingInto($("#ranking"), state.ranking, true);
 }
 
 function renderPending() {
@@ -134,11 +138,21 @@ function renderMatrix() {
   table.className = "matrix";
 
   const headRow = document.createElement("tr");
-  headRow.appendChild(document.createElement("th"));
-  for (const name of state.candidates) {
+  const corner = document.createElement("th");
+  corner.className = "matrix-corner";
+  corner.textContent = "选两项";
+  corner.title = "点击行/列标题选择两个候选项，查看双向最强路径与排名依据";
+  headRow.appendChild(corner);
+  for (let j = 0; j < state.candidates.length; j++) {
+    const name = state.candidates[j];
     const th = document.createElement("th");
     th.textContent = name;
-    th.title = name;
+    th.title = basisSelection.includes(name)
+      ? `${name}（已选择，再次点击取消）`
+      : `选择 ${name} 作为排名依据的第 ${basisSelection.length + 1} 个候选项`;
+    th.classList.add("matrix-pick");
+    if (basisSelection.includes(name)) th.classList.add("matrix-pick-selected");
+    th.addEventListener("click", () => toggleBasisCandidate(name));
     headRow.appendChild(th);
   }
   const thead = document.createElement("thead");
@@ -150,13 +164,21 @@ function renderMatrix() {
     const tr = document.createElement("tr");
     const th = document.createElement("th");
     th.textContent = state.candidates[i];
-    th.title = state.candidates[i];
+    th.title = basisSelection.includes(state.candidates[i])
+      ? `${state.candidates[i]}（已选择，再次点击取消）`
+      : `选择 ${state.candidates[i]} 作为排名依据的第 ${basisSelection.length + 1} 个候选项`;
+    th.classList.add("matrix-pick");
+    if (basisSelection.includes(state.candidates[i])) th.classList.add("matrix-pick-selected");
+    th.addEventListener("click", () => toggleBasisCandidate(state.candidates[i]));
     tr.appendChild(th);
     cells.forEach((cell, j) => {
       const td = document.createElement("td");
       td.className = `cell-${cell}`;
       td.textContent = SYMBOLS[cell];
       const key = `${i}:${j}`;
+      const isBasisPair = i !== j && basisSelection.length === 2 &&
+        basisSelection.includes(state.candidates[i]) &&
+        basisSelection.includes(state.candidates[j]);
       if (conflicts.has(key)) {
         td.classList.add("cell-conflict");
         td.title = "循环冲突组合，点击重新判定";
@@ -174,6 +196,14 @@ function renderMatrix() {
             a: state.candidates[Math.min(i, j)],
             b: state.candidates[Math.max(i, j)],
           });
+        });
+      } else if (i !== j) {
+        // 普通格：直接选中该组合查看排名依据（冲突/建议格仍优先复核操作）
+        td.classList.add("cell-basis-pick");
+        if (isBasisPair) td.classList.add("cell-basis");
+        td.title = "点击查看这两个候选项的排名依据";
+        td.addEventListener("click", () => {
+          pickBasisPair(state.candidates[i], state.candidates[j]);
         });
       }
       tr.appendChild(td);
@@ -233,7 +263,7 @@ function renderConflict() {
   renderSuggestion();
 }
 
-function renderRankingInto(box, groups) {
+function renderRankingInto(box, groups, selectable = false) {
   box.innerHTML = "";
   let rank = 1; // 竞争排名：并列后跳名次
   for (const group of groups) {
@@ -244,7 +274,21 @@ function renderRankingInto(box, groups) {
     badge.textContent = `第 ${rank} 名`;
     const names = document.createElement("span");
     names.className = "rank-names";
-    names.textContent = group.join(" ＝ ");
+    if (selectable) {
+      // 每个候选项单独可点（并列组内亦可任选两个比较）
+      group.forEach((name, i) => {
+        if (i > 0) names.appendChild(document.createTextNode(" ＝ "));
+        const item = document.createElement("span");
+        item.className =
+          "rank-name-item" + (basisSelection.includes(name) ? " selected" : "");
+        item.textContent = name;
+        item.title = "点击加入/移出「排名依据」选择（需两个候选项）";
+        item.addEventListener("click", () => toggleBasisCandidate(name));
+        names.appendChild(item);
+      });
+    } else {
+      names.textContent = group.join(" ＝ ");
+    }
     row.append(badge, names);
     box.appendChild(row);
     rank += group.length;
@@ -337,7 +381,186 @@ function jumpToRecommended() {
   $("#current-pair").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
+/* ---------- 排名依据 ---------- */
+
+function toggleBasisCandidate(name) {
+  const pos = basisSelection.indexOf(name);
+  if (pos >= 0) {
+    basisSelection.splice(pos, 1);
+  } else {
+    if (basisSelection.length >= 2) basisSelection.shift(); // 保留最新两个
+    basisSelection.push(name);
+  }
+  basisData = null;
+  basisReq += 1; // 使任何在途请求失效
+  renderRanking();
+  renderMatrix();
+  renderBasis();
+  if (basisSelection.length === 2) {
+    $("#basis-card").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+}
+
+function pickBasisPair(a, b) {
+  basisSelection = [a, b];
+  basisData = null;
+  basisReq += 1;
+  renderRanking();
+  renderMatrix();
+  renderBasis();
+  $("#basis-card").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function clearBasis() {
+  basisSelection = [];
+  basisData = null;
+  basisReq += 1;
+  renderRanking();
+  renderMatrix();
+  renderBasis();
+}
+
+function renderPathBlock(title, path, lead) {
+  const block = document.createElement("div");
+  block.className = "basis-path" + (lead ? " lead" : "");
+  const head = document.createElement("p");
+  head.className = "basis-path-title";
+  head.textContent = title;
+  block.appendChild(head);
+
+  if (!path.exists) {
+    const none = document.createElement("div");
+    none.className = "basis-none";
+    none.textContent = "无有效路径（不存在可到达的比较链）";
+    block.appendChild(none);
+    return block;
+  }
+
+  const meta = document.createElement("div");
+  meta.className = "basis-meta";
+  const strength = document.createElement("span");
+  strength.className = "basis-strength";
+  strength.textContent = `瓶颈强度 ${path.strength} · ${path.hops} 条边`;
+  meta.appendChild(strength);
+  block.appendChild(meta);
+
+  const chain = document.createElement("div");
+  chain.className = "basis-chain";
+  path.nodes.forEach((node, k) => {
+    if (k > 0) {
+      const e = path.edges[k - 1];
+      const edge = document.createElement("span");
+      edge.className = "basis-edge " + (e.kind === "win" ? "edge-win" : "edge-tie");
+      edge.textContent = e.kind === "win" ? " 胜 →" : " ＝平局＝";
+      edge.title = `边强度 ${e.strength}（${e.kind === "win" ? "直接胜负" : "直接平局"}）`;
+      chain.appendChild(edge);
+    }
+    const nodeEl = document.createElement("span");
+    nodeEl.className = "basis-node";
+    nodeEl.textContent = node;
+    chain.appendChild(nodeEl);
+  });
+  block.appendChild(chain);
+  return block;
+}
+
+function renderBasis() {
+  const card = $("#basis-card");
+
+  // 新一轮候选项变化后，剔除失效选择
+  if (state && basisSelection.some((n) => !state.candidates.includes(n))) {
+    basisSelection = basisSelection.filter((n) => state.candidates.includes(n));
+    basisData = null;
+  }
+
+  if (!state || basisSelection.length < 2) {
+    card.classList.add("hidden");
+    return;
+  }
+  const [a, b] = basisSelection;
+  card.classList.remove("hidden");
+  $("#basis-pair").textContent = `${a} ↔ ${b}`;
+
+  const box = $("#basis-directions");
+
+  // 以服务端数据为准；无数据或选择已变化时重新拉取（正反序共用同一响应）
+  const samePair = basisData &&
+    ((basisData.a === a && basisData.b === b) || (basisData.a === b && basisData.b === a));
+  if (!samePair) {
+    box.innerHTML = "";
+    const loadHint = document.createElement("p");
+    loadHint.className = "muted";
+    loadHint.textContent = "正在重建最强路径…";
+    box.appendChild(loadHint);
+    loadBasis(a, b);
+    return;
+  }
+
+  // 服务端按请求顺序返回；用户按相反顺序选择时整体交换两个方向展示
+  let data = basisData;
+  if (data.a !== a) {
+    data = {
+      a,
+      b,
+      verdict: data.verdict === "a" ? "b" : data.verdict === "b" ? "a" : "tie",
+      strength_ab: data.strength_ba,
+      strength_ba: data.strength_ab,
+      path_ab: data.path_ba,
+      path_ba: data.path_ab,
+    };
+  }
+
+  const verdict = $("#basis-verdict");
+  if (data.verdict === "a") {
+    verdict.textContent = `判定：「${a}」领先于「${b}」（${a}→${b} 最强 ${data.strength_ab} ＞ 反向 ${data.strength_ba}）`;
+    verdict.className = "basis-verdict verdict-a";
+  } else if (data.verdict === "b") {
+    verdict.textContent = `判定：「${b}」领先于「${a}」（${b}→${a} 最强 ${data.strength_ba} ＞ 反向 ${data.strength_ab}）`;
+    verdict.className = "basis-verdict verdict-b";
+  } else {
+    verdict.textContent = `判定：两者并列（双向最强强度均为 ${data.strength_ab}${data.strength_ab === 0 ? "，且双向均无有效路径" : ""}）`;
+    verdict.className = "basis-verdict verdict-tie";
+  }
+
+  box.innerHTML = "";
+  box.appendChild(
+    renderPathBlock(`${a} → ${b}（${a} 强于 ${b} 的最强路径）`, data.path_ab,
+      data.verdict === "a")
+  );
+  box.appendChild(
+    renderPathBlock(`${b} → ${a}（${b} 强于 ${a} 的最强路径）`, data.path_ba,
+      data.verdict === "b")
+  );
+}
+
+async function loadBasis(a, b) {
+  const req = ++basisReq;
+  try {
+    const data = await api(
+      `/api/sessions/${state.session_id}/ranking-basis?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`
+    );
+    if (req !== basisReq) return; // 已有更新的选择/状态，丢弃过期响应
+    basisData = data;
+    renderBasis();
+  } catch (e) {
+    if (req !== basisReq) return;
+    const box = $("#basis-directions");
+    box.innerHTML = "";
+    const err = document.createElement("p");
+    err.className = "basis-error";
+    err.textContent = `排名依据加载失败：${e.message}`;
+    box.appendChild(err);
+  }
+}
+
 /* ---------- 数据操作 ---------- */
+
+function stateChanged() {
+  // 判断新增、撤销、复核、批量改判、重置后：排名依据随状态刷新
+  basisData = null;
+  basisReq += 1; // 丢弃所有在途旧请求
+  render();
+}
 
 async function refresh() {
   const sid = localStorage.getItem(STORAGE_KEY);
@@ -366,7 +589,7 @@ async function judge(result) {
       body: JSON.stringify({ a, b, result }),
     });
     focusPair = null; // 判定完成后回到原顺序流程
-    render();
+    stateChanged();
   } catch (e) {
     toast(e.message);
     await refresh();
@@ -380,7 +603,7 @@ async function undo() {
   busy = true;
   try {
     state = await api(`/api/sessions/${state.session_id}/undo`, { method: "POST" });
-    render();
+    stateChanged();
   } catch (e) {
     toast(e.message);
   } finally {
@@ -397,7 +620,7 @@ async function revise(result) {
       body: JSON.stringify({ a: selectedPair.a, b: selectedPair.b, result }),
     });
     selectedPair = null;
-    render();
+    stateChanged();
     toast("判定已更新，排名与冲突已重算");
   } catch (e) {
     toast(e.message);
@@ -423,7 +646,7 @@ async function applySuggestion() {
       }),
     });
     selectedPair = null;
-    render();
+    stateChanged();
     toast(state.conflict ? "已应用方案，仍存在其他循环冲突" : "已批量改判，全部循环冲突已消除");
   } catch (e) {
     toast(e.message);
@@ -439,7 +662,7 @@ async function resetRound() {  if (busy || !state) return;
   try {
     state = await api(`/api/sessions/${state.session_id}/reset`, { method: "POST" });
     focusPair = null;
-    render();
+    stateChanged();
     toast("本轮已重置");
   } catch (e) {
     toast(e.message);
@@ -469,6 +692,8 @@ async function startSession() {
     localStorage.setItem(STORAGE_KEY, state.session_id);
     selectedPair = null;
     focusPair = null;
+    basisSelection = [];
+    basisData = null;
     render();
   } catch (e) {
     toast(e.message);
@@ -481,6 +706,8 @@ function newRound() {
   state = null;
   selectedPair = null;
   focusPair = null;
+  basisSelection = [];
+  basisData = null;
   showSetup();
 }
 
@@ -508,6 +735,7 @@ $("#revise-cancel").addEventListener("click", () => {
 });
 $("#suggestion-apply").addEventListener("click", applySuggestion);
 $("#nextpair-jump").addEventListener("click", jumpToRecommended);
+$("#basis-close").addEventListener("click", clearBasis);
 $("#jump-back").addEventListener("click", () => {
   focusPair = null;
   render();
